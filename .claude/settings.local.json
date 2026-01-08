@@ -6,7 +6,10 @@
       "Bash(ls:*)",
       "Bash(dir:*)",
       "Bash(python verify_video_protection.py:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nInitial commit - RobustFlow\n\nFeatures:\n- Adversarial attacks on image classifiers \\(PGD\\)\n- Text protection against OCR\n- Text camouflage with Unicode tricks\n- Video/Audio protection with FFmpeg.wasm\n- Full documentation for deployment\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit:*)",
+      "Bash(git push)"
     ]
   }
 }

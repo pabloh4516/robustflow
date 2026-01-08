@@ -6,14 +6,15 @@ fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
 python-multipart>=0.0.6
 
-# Deep Learning
-torch>=2.0.0
-torchvision>=0.15.0
+# Deep Learning - CPU only (mais leve para deploy)
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.1.0+cpu
+torchvision==0.16.0+cpu
 
 # Image Processing
 Pillow>=10.0.0
 numpy>=1.24.0
-opencv-python>=4.8.0
+opencv-python-headless>=4.8.0
 scipy>=1.11.0
 
 # Visualization
@@ -22,10 +23,8 @@ matplotlib>=3.7.0
 # Data Validation
 pydantic>=2.0.0
 
-# OCR Engines (opcional - instale conforme necessário)
-# pytesseract>=0.3.10  # Requer Tesseract instalado no sistema
-# easyocr>=1.7.0       # Deep learning based OCR
-# paddleocr>=2.7.0     # Alta precisão OCR
+# OCR
+pytesseract>=0.3.10
 
 # Development
 python-dotenv>=1.0.0
