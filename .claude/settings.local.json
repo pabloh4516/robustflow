@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m uvicorn:*)",
+      "Bash(npm run dev:*)",
+      "Bash(ls:*)",
+      "Bash(dir:*)",
+      "Bash(python verify_video_protection.py:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}
