@@ -168,13 +168,15 @@ function MediaProtection() {
         })
 
       } else if (fileType === 'audio') {
-        // Processa áudio
+        // Processa áudio com opções v2.1
         audioProcessor.onProgress = setProgress
         result = await audioProcessor.processAudio(file, {
           protectionLevel: visualCamouflage,
           addPsychoacousticNoise: audioProtection,
-          saturateFrequencies: true,
-          addMicroJitter: true
+          pulsatingNoise: true,
+          surgicalNotch: true,
+          preserveVowels: true,
+          preserveMusic: true  // v2.1: Preserva brilho musical
         })
       }
 

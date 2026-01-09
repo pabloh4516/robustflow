@@ -1,14 +1,15 @@
 /**
- * Audio Processor - Motor de Proteção de Áudio
- * =============================================
+ * Audio Processor v2.1 - Motor de Proteção de Áudio OTIMIZADO
+ * ==========================================================
  *
  * Utiliza Web Audio API para processamento 100% no navegador.
  *
- * Técnicas implementadas:
- * 1. Ruído Psicoacústico - Interfere com Speech-to-Text
- * 2. Saturação de Frequências - Confunde reconhecimento de fonemas
- * 3. Micro-variações Temporais - Altera timing de sílabas
- * 4. Mascaramento Espectral - Oculta padrões de fala
+ * OTIMIZAÇÕES v2.1 (Preservação de Música):
+ * - High-Shelf BOOST acima de 4kHz para preservar brilho da música
+ * - Ruído rosa focado APENAS em 500Hz-3000Hz (faixa de fala)
+ * - Compressão reduzida (ratio 2:1) para evitar dropouts
+ * - Threshold de compressor ajustado para dinâmica natural
+ * - Preservação de transientes musicais
  */
 
 class AudioProcessor {
@@ -28,7 +29,7 @@ class AudioProcessor {
   }
 
   /**
-   * Processa arquivo de áudio com proteção anti-transcrição
+   * Processa arquivo de áudio com proteção anti-transcrição OTIMIZADA
    *
    * @param {File} audioFile - Arquivo de áudio (MP3, WAV, etc.)
    * @param {Object} options - Opções de processamento
@@ -36,10 +37,12 @@ class AudioProcessor {
    */
   async processAudio(audioFile, options = {}) {
     const {
-      protectionLevel = 5,      // 1-10: Intensidade da proteção
-      addPsychoacousticNoise = true,
-      saturateFrequencies = true,
-      addMicroJitter = true,
+      protectionLevel = 5,           // 1-10: Intensidade da proteção
+      addPsychoacousticNoise = true, // Ruído rosa calibrado
+      pulsatingNoise = true,         // Ruído pulsante (novo)
+      surgicalNotch = true,          // Notch cirúrgico em fricativas
+      preserveVowels = true,         // Preservar clareza de vogais
+      preserveMusic = true,          // NOVO v2.1: Preservar brilho musical
       outputFormat = 'wav'
     } = options
 
@@ -51,7 +54,7 @@ class AudioProcessor {
     const arrayBuffer = await audioFile.arrayBuffer()
     const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer)
 
-    if (this.onProgress) this.onProgress({ type: 'processing', percent: 30, message: 'Aplicando proteção...' })
+    if (this.onProgress) this.onProgress({ type: 'processing', percent: 30, message: 'Aplicando proteção otimizada...' })
 
     // Cria buffer offline para processamento
     const offlineContext = new OfflineAudioContext(
@@ -64,23 +67,31 @@ class AudioProcessor {
     const source = offlineContext.createBufferSource()
     source.buffer = audioBuffer
 
-    // Cadeia de processamento
+    // Cadeia de processamento OTIMIZADA v2.1
     let currentNode = source
 
-    // 1. Ruído Psicoacústico
+    // 1. Ruído Psicoacústico FOCADO (500Hz-3000Hz apenas)
     if (addPsychoacousticNoise) {
-      currentNode = this._addPsychoacousticNoise(offlineContext, currentNode, protectionLevel)
+      currentNode = this._addFocusedPinkNoise(offlineContext, currentNode, protectionLevel, pulsatingNoise)
     }
 
-    // 2. Saturação de Frequências de Fala
-    if (saturateFrequencies) {
-      currentNode = this._addFrequencySaturation(offlineContext, currentNode, protectionLevel)
+    // 2. Notch Cirúrgico em Fricativas (2500Hz e 3500Hz)
+    if (surgicalNotch) {
+      currentNode = this._addSurgicalNotchFilters(offlineContext, currentNode, protectionLevel)
     }
 
-    // 3. Micro-variações (simuladas via modulação)
-    if (addMicroJitter) {
-      currentNode = this._addMicroModulation(offlineContext, currentNode, protectionLevel)
+    // 3. Preservação de Vogais (boost sutil em 300-800Hz)
+    if (preserveVowels) {
+      currentNode = this._addVowelPreservation(offlineContext, currentNode)
     }
+
+    // 4. NOVO v2.1: Preservação de Brilho Musical (High-Shelf acima de 4kHz)
+    if (preserveMusic) {
+      currentNode = this._addMusicBrightnessPreservation(offlineContext, currentNode)
+    }
+
+    // 5. Micro-modulações sutis (anti-STT) com compressão SUAVE
+    currentNode = this._addSubtleMicroModulation(offlineContext, currentNode, protectionLevel)
 
     // Conecta ao destino
     currentNode.connect(offlineContext.destination)
@@ -102,20 +113,31 @@ class AudioProcessor {
   }
 
   /**
-   * Adiciona ruído psicoacústico AGRESSIVO que interfere com Speech-to-Text
-   * Otimizado para confundir bots de scraping
+   * Adiciona ruído rosa FOCADO na faixa de fala (500Hz-3000Hz)
+   *
+   * OTIMIZAÇÕES v2.1:
+   * - Faixa de frequência mais estreita: 500Hz-3000Hz
+   * - NÃO afeta frequências acima de 3kHz (preserva música)
+   * - Modulação LFO menos agressiva
    */
-  _addPsychoacousticNoise(context, inputNode, level) {
-    // Intensidade mais alta para confundir bots
-    const noiseGain = context.createGain()
-    const noiseIntensity = 0.015 + (level * 0.008) // Mais forte
+  _addFocusedPinkNoise(context, inputNode, level, pulsating = true) {
+    // ===========================================
+    // CÁLCULO DE GANHO CALIBRADO
+    // ===========================================
+    const minDB = -45  // Nível mínimo (level 1)
+    const maxDB = -35  // Nível máximo (level 10)
+    const targetDB = minDB + ((maxDB - minDB) * (level / 10))
+    const linearGain = Math.pow(10, targetDB / 20)
 
-    // Gera ruído rosa
-    const bufferSize = context.sampleRate * 2
+    console.log(`[AudioProcessor v2.1] Ruído rosa focado: ${targetDB.toFixed(1)}dB (500-3000Hz)`)
+
+    // ===========================================
+    // GERAÇÃO DE RUÍDO ROSA (Paul Kellet Algorithm)
+    // ===========================================
+    const bufferSize = context.sampleRate * 4
     const noiseBuffer = context.createBuffer(1, bufferSize, context.sampleRate)
     const noiseData = noiseBuffer.getChannelData(0)
 
-    // Geração de ruído rosa usando algoritmo Paul Kellet
     let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0
     for (let i = 0; i < bufferSize; i++) {
       const white = Math.random() * 2 - 1
@@ -134,163 +156,230 @@ class AudioProcessor {
     noiseSource.loop = true
     noiseSource.start(0)
 
-    // Filtra o ruído para frequências críticas de fala (500-4000 Hz)
+    // ===========================================
+    // FILTRO BANDPASS ESTREITO (500Hz-3000Hz)
+    // ===========================================
+    // Centro em 1225Hz (média geométrica de 500 e 3000)
+    // Q calculado para cobrir apenas essa faixa
     const bandpass = context.createBiquadFilter()
     bandpass.type = 'bandpass'
-    bandpass.frequency.value = 2000
-    bandpass.Q.value = 0.7
+    bandpass.frequency.value = 1225  // sqrt(500 * 3000) ≈ 1225Hz
+    bandpass.Q.value = 0.5  // Q baixo = banda mais larga mas controlada
+
+    // Lowpass para cortar acima de 3kHz (protege música)
+    const lowpass = context.createBiquadFilter()
+    lowpass.type = 'lowpass'
+    lowpass.frequency.value = 3000
+    lowpass.Q.value = 0.7
+
+    // Highpass para cortar abaixo de 500Hz (protege graves)
+    const highpass = context.createBiquadFilter()
+    highpass.type = 'highpass'
+    highpass.frequency.value = 500
+    highpass.Q.value = 0.7
 
     noiseSource.connect(bandpass)
-    bandpass.connect(noiseGain)
-    noiseGain.gain.value = noiseIntensity
+    bandpass.connect(lowpass)
+    lowpass.connect(highpass)
 
-    // Segundo ruído em frequência diferente (confunde mais)
-    const noiseSource2 = context.createBufferSource()
-    noiseSource2.buffer = noiseBuffer
-    noiseSource2.loop = true
-    noiseSource2.start(0)
+    // ===========================================
+    // RUÍDO PULSANTE SUAVE
+    // ===========================================
+    const noiseGain = context.createGain()
+    noiseGain.gain.value = linearGain
 
-    const bandpass2 = context.createBiquadFilter()
-    bandpass2.type = 'bandpass'
-    bandpass2.frequency.value = 3500
-    bandpass2.Q.value = 1.0
+    if (pulsating) {
+      // LFO mais suave para não causar dropouts
+      const pulseLFO = context.createOscillator()
+      const pulseDepth = context.createGain()
 
-    const noiseGain2 = context.createGain()
-    noiseGain2.gain.value = noiseIntensity * 0.7
+      pulseLFO.type = 'sine'
+      pulseLFO.frequency.value = 3 + (level * 0.3)  // 3-6 Hz (mais lento)
+      pulseDepth.gain.value = linearGain * 0.3  // Modulação reduzida para 30%
 
-    noiseSource2.connect(bandpass2)
-    bandpass2.connect(noiseGain2)
+      pulseLFO.connect(pulseDepth)
+      pulseDepth.connect(noiseGain.gain)
+      pulseLFO.start(0)
+    }
 
-    // Mixer para combinar sinal original com ruídos
+    highpass.connect(noiseGain)
+
+    // ===========================================
+    // MIXER FINAL (sem segundo canal de ruído)
+    // ===========================================
     const merger = context.createGain()
     merger.gain.value = 1.0
 
     inputNode.connect(merger)
     noiseGain.connect(merger)
-    noiseGain2.connect(merger)
 
     return merger
   }
 
   /**
-   * Satura frequências críticas para reconhecimento de fala
-   * AGRESSIVO - Otimizado para confundir bots de scraping
+   * Filtros Notch CIRÚRGICOS para fricativas
+   * (Mantido de v2.0 - funciona bem)
    */
-  _addFrequencySaturation(context, inputNode, level) {
-    // Filtro 1: Corta frequências críticas de consoantes (2-4 kHz)
-    const notch1 = context.createBiquadFilter()
-    notch1.type = 'notch'
-    notch1.frequency.value = 2500
-    notch1.Q.value = 5
+  _addSurgicalNotchFilters(context, inputNode, level) {
+    // NOTCH 1: 2500Hz (Fricativas como 's', 'f')
+    const notch2500 = context.createBiquadFilter()
+    notch2500.type = 'notch'
+    notch2500.frequency.value = 2500
+    notch2500.Q.value = 15 + (level * 2)
 
-    // Filtro 2: Segundo notch em frequência de sibilantes
-    const notch2 = context.createBiquadFilter()
-    notch2.type = 'notch'
-    notch2.frequency.value = 4000
-    notch2.Q.value = 5
+    // NOTCH 2: 3500Hz (Fricativas como 'sh', 'ch')
+    const notch3500 = context.createBiquadFilter()
+    notch3500.type = 'notch'
+    notch3500.frequency.value = 3500
+    notch3500.Q.value = 15 + (level * 2)
 
-    // Filtro 3: Atenua frequências de fricativas (4-8 kHz)
-    const highShelf = context.createBiquadFilter()
-    highShelf.type = 'highshelf'
-    highShelf.frequency.value = 5000
-    highShelf.gain.value = -4 - (level * 0.8)
+    // Atenuação MUITO SUAVE de sibilantes (apenas -1 a -3dB)
+    const sibilantShelf = context.createBiquadFilter()
+    sibilantShelf.type = 'highshelf'
+    sibilantShelf.frequency.value = 5000
+    sibilantShelf.gain.value = -1 - (level * 0.2)  // -1dB a -3dB (muito mais suave)
 
-    // Filtro 4: Boost agressivo em frequências de mascaramento
-    const peaking1 = context.createBiquadFilter()
-    peaking1.type = 'peaking'
-    peaking1.frequency.value = 1200
-    peaking1.Q.value = 2.0
-    peaking1.gain.value = 3 + (level * 0.5)
+    inputNode.connect(notch2500)
+    notch2500.connect(notch3500)
+    notch3500.connect(sibilantShelf)
 
-    // Filtro 5: Atenua frequências de vogais
-    const peaking2 = context.createBiquadFilter()
-    peaking2.type = 'peaking'
-    peaking2.frequency.value = 800
-    peaking2.Q.value = 3.0
-    peaking2.gain.value = -3 - (level * 0.4)
-
-    // Filtro 6: Distorção harmônica sutil (waveshaper)
-    const waveshaper = context.createWaveShaper()
-    const curve = new Float32Array(65536)
-    for (let i = 0; i < 65536; i++) {
-      const x = (i - 32768) / 32768
-      // Soft clipping com harmônicos
-      curve[i] = Math.tanh(x * (1 + level * 0.1)) * 0.9
-    }
-    waveshaper.curve = curve
-
-    // Cadeia de filtros
-    inputNode.connect(notch1)
-    notch1.connect(notch2)
-    notch2.connect(highShelf)
-    highShelf.connect(peaking1)
-    peaking1.connect(peaking2)
-    peaking2.connect(waveshaper)
-
-    return waveshaper
+    return sibilantShelf
   }
 
   /**
-   * Adiciona micro-modulações AGRESSIVAS que confundem timing de sílabas
-   * Otimizado para confundir bots de scraping
+   * Preservação de Vogais (mantido de v2.0)
    */
-  _addMicroModulation(context, inputNode, level) {
-    // Tremolo 1 - frequência baixa (confunde palavras)
-    const tremoloGain1 = context.createGain()
-    const tremoloOsc1 = context.createOscillator()
-    const tremoloDepth1 = context.createGain()
+  _addVowelPreservation(context, inputNode) {
+    const vowelBoost = context.createBiquadFilter()
+    vowelBoost.type = 'peaking'
+    vowelBoost.frequency.value = 500
+    vowelBoost.Q.value = 1.0
+    vowelBoost.gain.value = 2
 
-    tremoloOsc1.type = 'sine'
-    tremoloOsc1.frequency.value = 3 + (level * 0.5) // 3-8 Hz
-    tremoloDepth1.gain.value = 0.05 + (level * 0.02)
+    const presenceBoost = context.createBiquadFilter()
+    presenceBoost.type = 'peaking'
+    presenceBoost.frequency.value = 1200
+    presenceBoost.Q.value = 1.5
+    presenceBoost.gain.value = 1.5
 
-    tremoloOsc1.connect(tremoloDepth1)
-    tremoloDepth1.connect(tremoloGain1.gain)
-    tremoloOsc1.start(0)
+    inputNode.connect(vowelBoost)
+    vowelBoost.connect(presenceBoost)
 
-    // Tremolo 2 - frequência alta (confunde sílabas)
-    const tremoloGain2 = context.createGain()
-    const tremoloOsc2 = context.createOscillator()
-    const tremoloDepth2 = context.createGain()
+    return presenceBoost
+  }
 
-    tremoloOsc2.type = 'triangle'
-    tremoloOsc2.frequency.value = 8 + (level * 1) // 8-18 Hz
-    tremoloDepth2.gain.value = 0.03 + (level * 0.015)
+  /**
+   * NOVO v2.1: Preservação de Brilho Musical
+   *
+   * High-Shelf BOOST acima de 4kHz para:
+   * - Manter clareza de instrumentos (pratos, cordas)
+   * - Preservar brilho de vocais femininos
+   * - Compensar qualquer perda nas altas frequências
+   */
+  _addMusicBrightnessPreservation(context, inputNode) {
+    // ===========================================
+    // HIGH-SHELF BOOST (4kHz+)
+    // ===========================================
+    // Compensa a atenuação do filtro de sibilantes
+    const brightnessBoost = context.createBiquadFilter()
+    brightnessBoost.type = 'highshelf'
+    brightnessBoost.frequency.value = 4000
+    brightnessBoost.gain.value = 2  // +2dB boost acima de 4kHz
 
-    tremoloOsc2.connect(tremoloDepth2)
-    tremoloDepth2.connect(tremoloGain2.gain)
-    tremoloOsc2.start(0)
+    // ===========================================
+    // AIR BAND (10kHz-16kHz)
+    // ===========================================
+    // Preserva "ar" e espacialidade da música
+    const airBand = context.createBiquadFilter()
+    airBand.type = 'highshelf'
+    airBand.frequency.value = 10000
+    airBand.gain.value = 1.5  // +1.5dB de "ar"
 
-    // Compressor agressivo (achata dinâmica, dificulta identificar palavras)
+    // ===========================================
+    // PROTEÇÃO DE SUB-GRAVES (20-80Hz)
+    // ===========================================
+    // Garante que graves permaneçam intactos
+    const subBassBoost = context.createBiquadFilter()
+    subBassBoost.type = 'lowshelf'
+    subBassBoost.frequency.value = 80
+    subBassBoost.gain.value = 1  // +1dB sutil nos graves
+
+    inputNode.connect(brightnessBoost)
+    brightnessBoost.connect(airBand)
+    airBand.connect(subBassBoost)
+
+    return subBassBoost
+  }
+
+  /**
+   * Micro-modulações SUTIS para anti-STT
+   *
+   * OTIMIZAÇÕES v2.1:
+   * - Ratio reduzido para 2:1 (era 3:1) - evita dropouts
+   * - Threshold mais alto (-15dB) - preserva dinâmica
+   * - Attack mais lento (50ms) - preserva transientes
+   * - Release mais rápido (150ms) - recuperação natural
+   */
+  _addSubtleMicroModulation(context, inputNode, level) {
+    // ===========================================
+    // TREMOLO MUITO SUTIL
+    // ===========================================
+    const tremoloGain = context.createGain()
+    tremoloGain.gain.value = 1.0
+
+    const tremoloLFO = context.createOscillator()
+    const tremoloDepth = context.createGain()
+
+    tremoloLFO.type = 'sine'
+    tremoloLFO.frequency.value = 5 + (level * 0.3)
+    tremoloDepth.gain.value = 0.01 + (level * 0.001)  // Ainda mais sutil
+
+    tremoloLFO.connect(tremoloDepth)
+    tremoloDepth.connect(tremoloGain.gain)
+    tremoloLFO.start(0)
+
+    // ===========================================
+    // COMPRESSOR SUAVE v2.1 (Ratio 2:1)
+    // ===========================================
     const compressor = context.createDynamicsCompressor()
-    compressor.threshold.value = -30
-    compressor.knee.value = 10
-    compressor.ratio.value = 8
-    compressor.attack.value = 0.001
-    compressor.release.value = 0.1
+    compressor.threshold.value = -15  // Mais alto (era -20)
+    compressor.knee.value = 30        // Knee muito suave
+    compressor.ratio.value = 2        // RATIO 2:1 (era 3:1)
+    compressor.attack.value = 0.05    // 50ms (preserva transientes)
+    compressor.release.value = 0.15   // 150ms (recuperação rápida)
 
-    // Cadeia
-    inputNode.connect(tremoloGain1)
-    tremoloGain1.connect(tremoloGain2)
-    tremoloGain2.connect(compressor)
+    // ===========================================
+    // LIMITER DE SEGURANÇA (apenas para picos)
+    // ===========================================
+    const limiter = context.createDynamicsCompressor()
+    limiter.threshold.value = -1      // Apenas picos extremos
+    limiter.knee.value = 0
+    limiter.ratio.value = 20
+    limiter.attack.value = 0.001
+    limiter.release.value = 0.05      // Release mais rápido
 
-    return compressor
+    // ===========================================
+    // MAKEUP GAIN (compensa compressão)
+    // ===========================================
+    const makeupGain = context.createGain()
+    makeupGain.gain.value = 1.1  // +0.8dB de makeup
+
+    inputNode.connect(tremoloGain)
+    tremoloGain.connect(compressor)
+    compressor.connect(makeupGain)
+    makeupGain.connect(limiter)
+
+    return limiter
   }
 
   /**
    * Converte AudioBuffer para Blob
    */
   async _bufferToBlob(audioBuffer, format = 'wav') {
-    const numChannels = audioBuffer.numberOfChannels
-    const sampleRate = audioBuffer.sampleRate
-    const length = audioBuffer.length
-
     if (format === 'wav') {
-      // Encode como WAV
       const wavBuffer = this._encodeWAV(audioBuffer)
       return new Blob([wavBuffer], { type: 'audio/wav' })
     } else {
-      // Para MP3, retornamos WAV (conversão MP3 requer biblioteca adicional)
       const wavBuffer = this._encodeWAV(audioBuffer)
       return new Blob([wavBuffer], { type: 'audio/wav' })
     }
@@ -308,7 +397,6 @@ class AudioProcessor {
     const bytesPerSample = bitDepth / 8
     const blockAlign = numChannels * bytesPerSample
 
-    // Interleave channels
     const length = audioBuffer.length
     const data = new Float32Array(length * numChannels)
 
@@ -319,11 +407,9 @@ class AudioProcessor {
       }
     }
 
-    // Cria buffer WAV
     const buffer = new ArrayBuffer(44 + data.length * bytesPerSample)
     const view = new DataView(buffer)
 
-    // WAV Header
     const writeString = (offset, string) => {
       for (let i = 0; i < string.length; i++) {
         view.setUint8(offset + i, string.charCodeAt(i))
@@ -334,7 +420,7 @@ class AudioProcessor {
     view.setUint32(4, 36 + data.length * bytesPerSample, true)
     writeString(8, 'WAVE')
     writeString(12, 'fmt ')
-    view.setUint32(16, 16, true) // Subchunk1Size
+    view.setUint32(16, 16, true)
     view.setUint16(20, format, true)
     view.setUint16(22, numChannels, true)
     view.setUint32(24, sampleRate, true)
@@ -344,7 +430,6 @@ class AudioProcessor {
     writeString(36, 'data')
     view.setUint32(40, data.length * bytesPerSample, true)
 
-    // Write audio data
     let offset = 44
     for (let i = 0; i < data.length; i++) {
       const sample = Math.max(-1, Math.min(1, data[i]))

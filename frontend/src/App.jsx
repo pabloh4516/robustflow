@@ -19,7 +19,8 @@ import MetricsPanel from './components/MetricsPanel'
 import TextProtection from './components/TextProtection'
 import TextCamouflage from './components/TextCamouflage'
 import MediaProtection from './components/MediaProtection'
-import { Shield, AlertTriangle, Zap, Info, Lock, Image, FileText, EyeOff, Video } from 'lucide-react'
+import BotEyeSimulator from './components/BotEyeSimulator'
+import { Shield, AlertTriangle, Zap, Info, Lock, Image, FileText, EyeOff, Video, Eye } from 'lucide-react'
 import { API_URL } from './config'
 
 function App() {
@@ -164,6 +165,17 @@ function App() {
               <Video className="w-4 h-4" />
               Proteção de Mídia
             </button>
+            <button
+              onClick={() => setActiveTab('bot-eye')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all
+                ${activeTab === 'bot-eye'
+                  ? 'bg-gradient-to-r from-cyan-600 to-teal-600 text-white'
+                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-200'
+                }`}
+            >
+              <Eye className="w-4 h-4" />
+              BotEye Simulator
+            </button>
           </div>
         </div>
       </header>
@@ -307,9 +319,12 @@ function App() {
         ) : activeTab === 'camouflage' ? (
           /* Camouflage Tab */
           <TextCamouflage />
-        ) : (
+        ) : activeTab === 'media-protection' ? (
           /* Media Protection Tab */
           <MediaProtection />
+        ) : (
+          /* BotEye Simulator Tab */
+          <BotEyeSimulator />
         )}
       </main>
 
