@@ -180,17 +180,32 @@ class VideoProcessor {
 
   /**
    * Constrói filtros de áudio para proteção contra transcrição
-   * Compatível com FFmpeg.wasm
+   * Técnicas agressivas anti-bot mas audíveis para humanos
    */
   _buildAudioFilters() {
     const filters = []
 
-    // 1. Filtros de frequência básicos
-    filters.push(`highpass=f=80`)
-    filters.push(`lowpass=f=14000`)
+    // 1. Pitch shift sutil (confunde modelos de voz)
+    filters.push(`asetrate=44100*1.04,aresample=44100`)
 
-    // 2. Echo sutil que confunde reconhecimento
-    filters.push(`aecho=0.6:0.3:20:0.3`)
+    // 2. Adiciona harmônicos que mascaram fonemas
+    filters.push(`afftdn=nf=-20`)
+
+    // 3. Chorus - cria "vozes fantasma" que confundem STT
+    filters.push(`chorus=0.5:0.9:50:0.4:0.25:2`)
+
+    // 4. Flanger sutil - altera fase do áudio
+    filters.push(`flanger=delay=2:depth=2:speed=0.5`)
+
+    // 5. Equalização anti-STT (atenua frequências críticas de fala)
+    filters.push(`equalizer=f=2000:t=q:w=1:g=-4`)
+    filters.push(`equalizer=f=4000:t=q:w=1:g=-3`)
+
+    // 6. Compressor agressivo (reduz dinâmica, dificulta detecção de palavras)
+    filters.push(`acompressor=threshold=-20dB:ratio=6:attack=5:release=50`)
+
+    // 7. Tremolo rápido imperceptível (confunde timing)
+    filters.push(`tremolo=f=8:d=0.1`)
 
     return filters.join(',')
   }

@@ -102,15 +102,15 @@ class AudioProcessor {
   }
 
   /**
-   * Adiciona ruído psicoacústico que interfere com Speech-to-Text
-   * Frequências escolhidas para serem imperceptíveis mas efetivas
+   * Adiciona ruído psicoacústico AGRESSIVO que interfere com Speech-to-Text
+   * Otimizado para confundir bots de scraping
    */
   _addPsychoacousticNoise(context, inputNode, level) {
-    // Cria gerador de ruído
+    // Intensidade mais alta para confundir bots
     const noiseGain = context.createGain()
-    const noiseIntensity = 0.005 + (level * 0.003) // 0.008 a 0.035
+    const noiseIntensity = 0.015 + (level * 0.008) // Mais forte
 
-    // Gera ruído rosa (mais natural que ruído branco)
+    // Gera ruído rosa
     const bufferSize = context.sampleRate * 2
     const noiseBuffer = context.createBuffer(1, bufferSize, context.sampleRate)
     const noiseData = noiseBuffer.getChannelData(0)
@@ -134,95 +134,145 @@ class AudioProcessor {
     noiseSource.loop = true
     noiseSource.start(0)
 
-    // Filtra o ruído para frequências que afetam STT (300-3400 Hz)
+    // Filtra o ruído para frequências críticas de fala (500-4000 Hz)
     const bandpass = context.createBiquadFilter()
     bandpass.type = 'bandpass'
-    bandpass.frequency.value = 1500
-    bandpass.Q.value = 0.5
+    bandpass.frequency.value = 2000
+    bandpass.Q.value = 0.7
 
     noiseSource.connect(bandpass)
     bandpass.connect(noiseGain)
     noiseGain.gain.value = noiseIntensity
 
-    // Mixer para combinar sinal original com ruído
+    // Segundo ruído em frequência diferente (confunde mais)
+    const noiseSource2 = context.createBufferSource()
+    noiseSource2.buffer = noiseBuffer
+    noiseSource2.loop = true
+    noiseSource2.start(0)
+
+    const bandpass2 = context.createBiquadFilter()
+    bandpass2.type = 'bandpass'
+    bandpass2.frequency.value = 3500
+    bandpass2.Q.value = 1.0
+
+    const noiseGain2 = context.createGain()
+    noiseGain2.gain.value = noiseIntensity * 0.7
+
+    noiseSource2.connect(bandpass2)
+    bandpass2.connect(noiseGain2)
+
+    // Mixer para combinar sinal original com ruídos
     const merger = context.createGain()
     merger.gain.value = 1.0
 
     inputNode.connect(merger)
     noiseGain.connect(merger)
+    noiseGain2.connect(merger)
 
     return merger
   }
 
   /**
    * Satura frequências críticas para reconhecimento de fala
-   * Faixa de frequência de fala: 300-3400 Hz
+   * AGRESSIVO - Otimizado para confundir bots de scraping
    */
   _addFrequencySaturation(context, inputNode, level) {
-    // Equalização que confunde reconhecimento de fonemas
+    // Filtro 1: Corta frequências críticas de consoantes (2-4 kHz)
+    const notch1 = context.createBiquadFilter()
+    notch1.type = 'notch'
+    notch1.frequency.value = 2500
+    notch1.Q.value = 5
 
-    // Filtro 1: Atenua frequências de fricativas (4-8 kHz)
+    // Filtro 2: Segundo notch em frequência de sibilantes
+    const notch2 = context.createBiquadFilter()
+    notch2.type = 'notch'
+    notch2.frequency.value = 4000
+    notch2.Q.value = 5
+
+    // Filtro 3: Atenua frequências de fricativas (4-8 kHz)
     const highShelf = context.createBiquadFilter()
     highShelf.type = 'highshelf'
     highShelf.frequency.value = 5000
-    highShelf.gain.value = -2 - (level * 0.5)
+    highShelf.gain.value = -4 - (level * 0.8)
 
-    // Filtro 2: Boost sutil em frequências de mascaramento (1-2 kHz)
+    // Filtro 4: Boost agressivo em frequências de mascaramento
     const peaking1 = context.createBiquadFilter()
     peaking1.type = 'peaking'
-    peaking1.frequency.value = 1500
-    peaking1.Q.value = 1.0
-    peaking1.gain.value = 1 + (level * 0.3)
+    peaking1.frequency.value = 1200
+    peaking1.Q.value = 2.0
+    peaking1.gain.value = 3 + (level * 0.5)
 
-    // Filtro 3: Atenua frequências de vogais (500-1000 Hz) levemente
+    // Filtro 5: Atenua frequências de vogais
     const peaking2 = context.createBiquadFilter()
     peaking2.type = 'peaking'
-    peaking2.frequency.value = 700
-    peaking2.Q.value = 2.0
-    peaking2.gain.value = -1 - (level * 0.2)
+    peaking2.frequency.value = 800
+    peaking2.Q.value = 3.0
+    peaking2.gain.value = -3 - (level * 0.4)
 
-    // Filtro 4: Notch em frequência crítica de plosivas
-    const notch = context.createBiquadFilter()
-    notch.type = 'notch'
-    notch.frequency.value = 2500
-    notch.Q.value = 10
+    // Filtro 6: Distorção harmônica sutil (waveshaper)
+    const waveshaper = context.createWaveShaper()
+    const curve = new Float32Array(65536)
+    for (let i = 0; i < 65536; i++) {
+      const x = (i - 32768) / 32768
+      // Soft clipping com harmônicos
+      curve[i] = Math.tanh(x * (1 + level * 0.1)) * 0.9
+    }
+    waveshaper.curve = curve
 
     // Cadeia de filtros
-    inputNode.connect(highShelf)
+    inputNode.connect(notch1)
+    notch1.connect(notch2)
+    notch2.connect(highShelf)
     highShelf.connect(peaking1)
     peaking1.connect(peaking2)
-    peaking2.connect(notch)
+    peaking2.connect(waveshaper)
 
-    return notch
+    return waveshaper
   }
 
   /**
-   * Adiciona micro-modulações que confundem timing de sílabas
+   * Adiciona micro-modulações AGRESSIVAS que confundem timing de sílabas
+   * Otimizado para confundir bots de scraping
    */
   _addMicroModulation(context, inputNode, level) {
-    // Tremolo muito sutil (variação de amplitude)
-    const tremoloGain = context.createGain()
-    const tremoloOsc = context.createOscillator()
-    const tremoloDepth = context.createGain()
+    // Tremolo 1 - frequência baixa (confunde palavras)
+    const tremoloGain1 = context.createGain()
+    const tremoloOsc1 = context.createOscillator()
+    const tremoloDepth1 = context.createGain()
 
-    tremoloOsc.type = 'sine'
-    tremoloOsc.frequency.value = 0.5 + (level * 0.3) // 0.5-3.5 Hz
-    tremoloDepth.gain.value = 0.02 + (level * 0.01) // Profundidade muito sutil
+    tremoloOsc1.type = 'sine'
+    tremoloOsc1.frequency.value = 3 + (level * 0.5) // 3-8 Hz
+    tremoloDepth1.gain.value = 0.05 + (level * 0.02)
 
-    tremoloOsc.connect(tremoloDepth)
-    tremoloDepth.connect(tremoloGain.gain)
-    tremoloOsc.start(0)
+    tremoloOsc1.connect(tremoloDepth1)
+    tremoloDepth1.connect(tremoloGain1.gain)
+    tremoloOsc1.start(0)
 
-    // Compressor para normalizar variações
+    // Tremolo 2 - frequência alta (confunde sílabas)
+    const tremoloGain2 = context.createGain()
+    const tremoloOsc2 = context.createOscillator()
+    const tremoloDepth2 = context.createGain()
+
+    tremoloOsc2.type = 'triangle'
+    tremoloOsc2.frequency.value = 8 + (level * 1) // 8-18 Hz
+    tremoloDepth2.gain.value = 0.03 + (level * 0.015)
+
+    tremoloOsc2.connect(tremoloDepth2)
+    tremoloDepth2.connect(tremoloGain2.gain)
+    tremoloOsc2.start(0)
+
+    // Compressor agressivo (achata dinâmica, dificulta identificar palavras)
     const compressor = context.createDynamicsCompressor()
-    compressor.threshold.value = -24
-    compressor.knee.value = 30
-    compressor.ratio.value = 4
-    compressor.attack.value = 0.003
-    compressor.release.value = 0.25
+    compressor.threshold.value = -30
+    compressor.knee.value = 10
+    compressor.ratio.value = 8
+    compressor.attack.value = 0.001
+    compressor.release.value = 0.1
 
-    inputNode.connect(tremoloGain)
-    tremoloGain.connect(compressor)
+    // Cadeia
+    inputNode.connect(tremoloGain1)
+    tremoloGain1.connect(tremoloGain2)
+    tremoloGain2.connect(compressor)
 
     return compressor
   }
